@@ -5,47 +5,63 @@ using Http;
 @service(#{ title: "Pet Store API" })
 namespace PetStore;
 
-model Pet {
-  @doc("Unique pet identifier")
-  id: string;
+// ── Custom scalars ────────────────────────────────────────────────
 
-  @minLength(1)
-  name: string;
+/** UUID-formatted pet identifier */
+@format("uuid")
+scalar PetId extends string;
 
+/** Pet name: letters and spaces only, 1–100 chars */
+@minLength(1)
+@maxLength(100)
+@pattern("^[A-Za-z ]+$")
+scalar PetName extends string;
+
+// ── Base model (shared fields) ────────────────────────────────────
+
+/** Common writable fields shared by Pet and CreatePetRequest */
+model PetBase {
+  name: PetName;
   kind: "cat" | "dog" | "bird";
   age?: uint8;
+}
+
+// ── Concrete models using spread ──────────────────────────────────
+
+model Pet {
+  @doc("Unique pet identifier")
+  id: PetId;
+  ...PetBase; // spread all PetBase fields in
 }
 
 model CreatePetRequest {
-  @minLength(1)
-  name: string;
-
-  kind: "cat" | "dog" | "bird";
-  age?: uint8;
+  ...PetBase; // same fields, without id
 }
+
+// ── Operations ────────────────────────────────────────────────────
 
 @route("/pets")
 interface Pets {
   @get
   listPets(@query skip?: int32, @query top?: int32): Page<Pet>;
 
-  // Update createPet
   @post
   createPet(@body b: CreatePetRequest): Pet | ValidationError;
 
-  // Update getPet to return union
   @get
   @route("/{id}")
-  getPet(@path id: string): Pet | NotFoundError;
+  getPet(@path id: PetId): Pet | NotFoundError;
 
   @put
   @route("/{id}")
-  updatePet(@path id: string, @body body: CreatePetRequest): Pet;
+  updatePet(@path id: PetId, @body body: CreatePetRequest): Pet;
 
   @delete
   @route("/{id}")
-  deletePet(@path id: string): void;
+  deletePet(@path id: PetId): void;
 }
+
+// ── Error models ──────────────────────────────────────────────────
 
 @error
 model NotFoundError {

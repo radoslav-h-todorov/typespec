@@ -290,6 +290,9 @@
           <li>Core Syntax &amp; Features</li>
           <li>The TypeSpec Ecosystem</li>
           <li>Hands-On Walkthrough</li>
+          <li>Spread, Composition &amp; UUID</li>
+          <li>Emitters, Linters &amp; <code>@pattern</code></li>
+          <li>Alternative Solutions (Smithy…)</li>
         </ul>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
@@ -637,6 +640,7 @@ paths:
             <tr><td><code>@minLength @maxLength</code></td><td>string constraints</td></tr>
             <tr><td><code>@minValue @maxValue</code></td><td>numeric constraints</td></tr>
             <tr><td><code>@format</code></td><td>e.g. "uuid", "date-time"</td></tr>
+            <tr><td><code>@pattern</code></td><td>regex constraint on string values</td></tr>
             <tr><td><code>@key</code></td><td>marks the resource identifier</td></tr>
           </tbody>
         </table>
@@ -794,6 +798,10 @@ paths:
 <span class="ty">@minLength</span>(<span class="nu">1</span>) <span class="ty">@maxLength</span>(<span class="nu">255</span>)
 <span class="kw">scalar</span> <span class="ty">NonEmptyString</span> <span class="kw">extends</span> <span class="kw">string</span>;
 
+<span class="cm">// Regex-validated scalar</span>
+<span class="ty">@pattern</span>(<span class="st">"^[\\w.+-]+@[\\w-]+\\.[\\w.]+$"</span>)
+<span class="kw">scalar</span> <span class="ty">EmailAddress</span> <span class="kw">extends</span> <span class="kw">string</span>;
+
 <span class="cm">// Enums</span>
 <span class="kw">enum</span> <span class="ty">PetKind</span> {
   Cat: <span class="st">"cat"</span>,
@@ -810,7 +818,7 @@ paths:
       <div style="display:flex;flex-direction:column;gap:10px">
         <div class="card">
           <h3>Scalars</h3>
-          <p>Create domain-specific types that carry validation rules. Use <code>Uuid</code> everywhere → impossible to accidentally pass a bare string.</p>
+          <p>Create domain-specific types carrying validation rules — length, range, <code>@format("uuid")</code>, and <code>@pattern("regex")</code>. Use them everywhere for compile-time safety; impossible to accidentally pass a bare string.</p>
         </div>
         <div class="card">
           <h3>Enums</h3>
@@ -1360,9 +1368,9 @@ tsp compile .
         <div class="card">
           <h3>Where to go next</h3>
           <ul>
+            <li>Step 6 → Spread / Composition &amp; UUID scalars</li>
+            <li>Step 7 → Emitters &amp; Linters</li>
             <li><code>tsp init</code> with Azure template</li>
-            <li>Add <code>@typespec/versioning</code></li>
-            <li>Publish shared types as an npm package</li>
           </ul>
         </div>
       </div>
@@ -1370,9 +1378,203 @@ tsp compile .
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SLIDE 28 – Q&A / Resources
+       SLIDE 28 – Hands-on Step 6: Spread / Composition + UUID
   ══════════════════════════════════════════════════════════════════ -->
   <div class="slide" id="s28">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 6</div>
+        <h2>Spread / Composition &amp; UUID</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Compose models with the spread operator</p>
+        <pre>
+<span class="cm">// Custom scalar — UUID identifier</span>
+<span class="ty">@format</span>(<span class="st">"uuid"</span>)
+<span class="kw">scalar</span> <span class="ty">PetId</span> <span class="kw">extends</span> <span class="kw">string</span>;
+
+<span class="cm">// Length + regex constraint</span>
+<span class="ty">@minLength</span>(<span class="nu">1</span>) <span class="ty">@maxLength</span>(<span class="nu">100</span>)
+<span class="ty">@pattern</span>(<span class="st">"^[A-Za-z ]+$"</span>)
+<span class="kw">scalar</span> <span class="ty">PetName</span> <span class="kw">extends</span> <span class="kw">string</span>;
+
+<span class="cm">// Shared base model</span>
+<span class="kw">model</span> <span class="ty">PetBase</span> {
+  <span class="prop">name</span>: <span class="ty">PetName</span>;
+  <span class="prop">kind</span>: <span class="st">"cat"</span> | <span class="st">"dog"</span> | <span class="st">"bird"</span>;
+  <span class="prop">age</span>?: <span class="kw">uint8</span>;
+}
+
+<span class="cm">// Spread PetBase — add id on top</span>
+<span class="kw">model</span> <span class="ty">Pet</span> {
+  <span class="prop">id</span>: <span class="ty">PetId</span>;
+  ...<span class="ty">PetBase</span>;
+}
+
+<span class="cm">// CreatePetRequest = PetBase (no id)</span>
+<span class="kw">model</span> <span class="ty">CreatePetRequest</span> {
+  ...<span class="ty">PetBase</span>;
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card">
+          <h3>Spread operator <code>...</code></h3>
+          <p>Inlines all properties of the target model — exactly like TypeScript object spread. Ideal for the Create / Update / Read pattern where models differ only by presence of <code>id</code>.</p>
+        </div>
+        <div class="card">
+          <h3>UUID scalar</h3>
+          <p><code>@format("uuid")</code> emits <code>format: uuid</code> in OpenAPI. A branded type — prevents mixing up IDs with plain strings across operations at compile time.</p>
+        </div>
+        <div class="card">
+          <h3><code>@pattern</code></h3>
+          <p>Attaches a regex constraint. Emits <code>pattern: "..."</code> in JSON Schema / OpenAPI 3. Great for names, slugs, phone numbers, emails — anything with a fixed format.</p>
+        </div>
+        <div class="card" style="border-color:var(--green)">
+          <h3>Zero duplication</h3>
+          <p>Add a field to <code>PetBase</code> once — it propagates automatically to both <code>Pet</code> and <code>CreatePetRequest</code>. No drift between request and response shapes.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 29 – Hands-on Step 7: Emitters & Linters
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s29">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 7</div>
+        <h2>Emitters &amp; Linters</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Multiple emitters + linter rules in <code>tspconfig.yaml</code></p>
+        <pre style="font-size:.78rem">
+emit:
+  - "@typespec/openapi3"
+  - "@typespec/json-schema"
+
+options:
+  "@typespec/openapi3":
+    emitter-output-dir: "{output-dir}/schema"
+    openapi-versions:
+      - 3.1.0
+  "@typespec/json-schema":
+    emitter-output-dir: "{output-dir}/json-schema"
+
+linter:
+  extends:
+    - "@typespec/http/all"
+  rules:
+    "@typespec/http/op-reference-container-route": "warn"</pre>
+        <p class="muted" style="margin-top:10px;margin-bottom:8px">Suppress a rule for one operation</p>
+        <pre style="font-size:.82rem">
+<span class="cm">// Opt-out for a single op with a reason</span>
+<span class="ty">#suppress</span> <span class="st">"@typespec/http/missing-uri-template"</span> <span class="st">"legacy route"</span>
+<span class="ty">@get</span>
+<span class="kw">op</span> <span class="fn">search</span>(<span class="ty">@query</span> <span class="prop">q</span>: <span class="kw">string</span>): <span class="ty">Pet</span>[];</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card">
+          <h3>Emitters</h3>
+          <p>Plugins that read the TypeSpec type graph and write output files. Every configured emitter runs in a single <code>tsp compile .</code> — one source, multiple artefacts.</p>
+        </div>
+        <div class="card">
+          <h3>Built-in lint rules</h3>
+          <ul style="font-size:.95rem">
+            <li><code>@typespec/http/all</code> activates all HTTP rules</li>
+            <li>Warns on missing <code>@doc</code>, ambiguous routes, duplicate ops</li>
+            <li>Errors on invalid unions and missing status codes</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Custom linters</h3>
+          <p>Write rules in TypeScript, publish as an npm package. Enforce team conventions: required decorators, naming patterns, forbidden scalar types — all compiler-checked.</p>
+        </div>
+        <div class="card" style="border-color:var(--accent)">
+          <h3>CI pipeline</h3>
+          <p><code>tsp compile .</code> exits <code>1</code> on any error. Drop it into GitHub Actions or Azure DevOps — broken specs can never merge.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 30 – Alternative Solutions
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s30">
+    <div class="slide-label">Ecosystem – Alternatives</div>
+    <h2>Alternative Solutions</h2>
+    <table style="margin-top:6px;font-size:.92rem">
+      <thead>
+        <tr><th>Tool</th><th>Origin</th><th>Primary Output</th><th>Strengths</th><th>Limitations</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color:var(--accent)">TypeSpec</strong></td>
+          <td>Microsoft</td>
+          <td>OpenAPI, JSON Schema, Protobuf</td>
+          <td class="yes">Generics, decorators, multi-protocol, TypeScript syntax</td>
+          <td>Younger ecosystem, MS-focused docs</td>
+        </tr>
+        <tr>
+          <td><strong>Smithy</strong></td>
+          <td>AWS</td>
+          <td>OpenAPI, AWS SDK, Smithy IDL</td>
+          <td class="yes">Mature, AWS SDK codegen, rich trait system</td>
+          <td>Java-centric tooling, steeper learning curve</td>
+        </tr>
+        <tr>
+          <td><strong>Raw OpenAPI 3.1</strong></td>
+          <td>OpenAPI Initiative</td>
+          <td>OpenAPI (is the output)</td>
+          <td>Universal standard, massive tooling ecosystem</td>
+          <td class="no">Verbose YAML, no generics, fragile <code>$ref</code></td>
+        </tr>
+        <tr>
+          <td><strong>Protobuf / gRPC</strong></td>
+          <td>Google</td>
+          <td><code>.proto</code>, gRPC stubs</td>
+          <td class="yes">High performance, polyglot codegen, compact wire format</td>
+          <td>Binary protocol, not REST/browser-friendly</td>
+        </tr>
+        <tr>
+          <td><strong>GraphQL SDL</strong></td>
+          <td>Meta</td>
+          <td>GraphQL schema</td>
+          <td class="yes">Self-describing, flexible client-driven queries</td>
+          <td>Different paradigm, not REST/HTTP native</td>
+        </tr>
+        <tr>
+          <td><strong>RAML</strong></td>
+          <td>MuleSoft</td>
+          <td>OpenAPI (via converter)</td>
+          <td>Clean YAML DSL, MuleSoft integration</td>
+          <td class="no">Declining adoption, limited modern tooling</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="cols cols-2" style="margin-top:10px">
+      <div class="card">
+        <h3>TypeSpec vs Smithy</h3>
+        <p>Both solve the same core problem from the two largest cloud API producers. TypeSpec has TypeScript-like syntax and broader protocol support out of the box. Smithy has a more mature AWS SDK generation story. Pick TypeSpec for REST-first or multi-protocol needs; Smithy if you're building deep inside the AWS SDK ecosystem.</p>
+      </div>
+      <div class="card">
+        <h3>The broader trend</h3>
+        <p>The industry is converging on IDL-based API design. Raw OpenAPI YAML is increasingly treated as a <em>compilation target</em>, not a source of truth. TypeSpec and Smithy both validate this direction — from the two companies responsible for the world's largest public API surfaces.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 31 – Q&A / Resources
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s31">
     <div class="slide-label">Fin</div>
     <h2>Resources &amp; Q&amp;A</h2>
     <div class="cols cols-2" style="flex:1;align-items:start">
@@ -1415,7 +1617,7 @@ tsp compile .
 <!-- Controls -->
 <div id="controls">
   <button id="btn-prev" disabled>← Prev</button>
-  <span id="slide-counter">1 / 28</span>
+  <span id="slide-counter">1 / 31</span>
   <button id="btn-next">Next →</button>
   <span style="color:var(--muted);font-size:.8rem;margin-left:20px">
     ← → arrow keys also work &nbsp;|&nbsp; F for fullscreen
