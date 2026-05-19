@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TypeSpec – From Swagger Pain to API-First Clarity</title>
+<style>
+  /* ─── Reset & Variables ─────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --border:   #2d3148;
+    --accent:   #6c8ef7;
+    --accent2:  #a78bfa;
+    --green:    #34d399;
+    --red:      #f87171;
+    --yellow:   #fbbf24;
+    --text:     #e2e8f0;
+    --muted:    #8892a4;
+    --code-bg:  #0d1117;
+  }
+
+  body {
+    background: #07080e;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    padding: 8px 0 0;
+    overflow: hidden;
+  }
+
+  /* ─── Deck container ────────────────────────────────────────────── */
+  #deck {
+    position: relative;
+    width: min(96vw, 1100px);
+    height: calc(100vh - 88px);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* ─── Individual slides ─────────────────────────────────────────── */
+  .slide {
+    position: absolute;
+    inset: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 36px;
+    display: none;
+    flex-direction: column;
+    gap: 14px;
+    opacity: 0;
+    transform: translateX(60px);
+    transition: opacity .35s ease, transform .35s ease;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  /* Scrollbar styling inside slides */
+  .slide::-webkit-scrollbar { width: 5px; }
+  .slide::-webkit-scrollbar-track { background: transparent; }
+  .slide::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .slide::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+  .slide.active {
+    display: flex;
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .slide.exit-left {
+    display: flex;
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+
+  /* ─── Typography ────────────────────────────────────────────────── */
+  .slide-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: -8px;
+  }
+  h1 { font-size: 2.1rem; font-weight: 700; line-height: 1.15; }
+  h2 { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+  h3 { font-size: 1rem; font-weight: 600; color: var(--accent2); margin-bottom: 4px; }
+  .subtitle { font-size: 1.05rem; color: var(--muted); }
+  p  { font-size: .92rem; line-height: 1.65; color: var(--text); }
+  .muted { color: var(--muted); font-size: .84rem; }
+
+  /* ─── Lists ─────────────────────────────────────────────────────── */
+  ul, ol { padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+  li { font-size: .91rem; line-height: 1.55; }
+  li::marker { color: var(--accent); }
+
+  /* ─── Code blocks ───────────────────────────────────────────────── */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: .78rem;
+    line-height: 1.55;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  }
+  code { font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace; font-size: .88em; }
+  .kw  { color: #79c0ff; }   /* keyword */
+  .ty  { color: #ffa657; }   /* type / decorator */
+  .st  { color: #a5d6ff; }   /* string */
+  .cm  { color: #8b949e; }   /* comment */
+  .fn  { color: #d2a8ff; }   /* function / op name */
+  .nu  { color: #79c0ff; }   /* number */
+  .prop{ color: #e6edf3; }   /* property */
+
+  /* ─── Two-column helpers ────────────────────────────────────────── */
+  .cols   { display: grid; gap: 14px; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* ─── Badges / pills ────────────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: .78rem;
+    font-weight: 600;
+  }
+  .badge-blue   { background: #1e3a5f; color: #93c5fd; }
+  .badge-purple { background: #2d1b69; color: #c4b5fd; }
+  .badge-green  { background: #064e3b; color: #6ee7b7; }
+  .badge-red    { background: #450a0a; color: #fca5a5; }
+  .badge-yellow { background: #451a03; color: #fcd34d; }
+
+  /* ─── Comparison table ──────────────────────────────────────────── */
+  table { border-collapse: collapse; width: 100%; font-size: .87rem; }
+  th {
+    background: #1e2030;
+    padding: 6px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child td { border-bottom: none; }
+  .yes { color: var(--green); font-weight: 600; }
+  .no  { color: var(--red);   font-weight: 600; }
+
+  /* ─── Timeline / steps ──────────────────────────────────────────── */
+  .step-list { display: flex; flex-direction: column; gap: 8px; }
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step-body { font-size: .88rem; line-height: 1.55; }
+
+  /* ─── Progress bar ──────────────────────────────────────────────── */
+  #progress-wrap {
+    width: min(96vw, 1100px);
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+  #progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width .35s ease;
+  }
+
+  /* ─── Controls ──────────────────────────────────────────────────── */
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 8px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 22px;
+    font-size: .9rem;
+    cursor: pointer;
+    transition: background .2s, border-color .2s;
+  }
+  button:hover { background: #22273a; border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .35; cursor: default; }
+
+  #slide-counter { color: var(--muted); font-size: .9rem; min-width: 70px; text-align: center; }
+
+  /* ─── Divider ────────────────────────────────────────────────────── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+
+  /* ─── Big number stat ───────────────────────────────────────────── */
+  .stat { font-size: 2.2rem; font-weight: 800; color: var(--accent); }
+
+  /* ─── Title slide accent line ───────────────────────────────────── */
+  .accent-bar {
+    width: 60px; height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    margin: 8px 0 16px;
+  }
+
+  /* ─── Hands-on marker ───────────────────────────────────────────── */
+  .hands-on-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .icon-demo {
+    font-size: 1.5rem;
+  }
+
+  /* ─── Emoji bullet ──────────────────────────────────────────────── */
+  .emoji-list { list-style: none; padding: 0; }
+  .emoji-list li { display: flex; gap: 10px; align-items: flex-start; }
+  .emoji-list li span.em { flex-shrink: 0; }
+
+  /* ─── Section divider slide ─────────────────────────────────────── */
+  .section-slide {
+    background: linear-gradient(135deg, #13162b 0%, #1a1d27 100%);
+    justify-content: center;
+    text-align: center;
+    gap: 16px;
+  }
+  .section-slide .big-icon { font-size: 3.5rem; }
+</style>
+</head>
+<body>
+
+<div id="deck">
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 1 – Title
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide active" id="s1">
+    <div class="accent-bar"></div>
+    <h1>From Swagger to <span style="color:var(--accent)">TypeSpec</span></h1>
+    <p class="subtitle">Designing APIs with clarity, power, and a single source of truth</p>
+    <div style="flex:1"></div>
+    <div class="cols cols-2" style="margin-top: auto;">
+      <div>
+        <p class="muted">Topics covered</p>
+        <ul style="margin-top:8px">
+          <li>The Problem with OpenAPI / Swagger</li>
+          <li>What is TypeSpec?</li>
+          <li>Code-First with TypeSpec</li>
+          <li>Core Syntax &amp; Features</li>
+          <li>The TypeSpec Ecosystem</li>
+          <li>Hands-On Walkthrough</li>
+        </ul>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
+        <div class="badge badge-purple">~30 min presentation</div>
+        <div class="badge badge-blue">+ hands-on demo</div>
+        <p class="muted" style="margin-top:6px">Presenter: <strong>You</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 2 – The reality of OpenAPI today
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s2">
+    <div class="slide-label">The Problem</div>
+    <h2>The Reality of Writing OpenAPI by Hand</h2>
+    <div class="cols cols-2" style="flex:1">
+      <pre style="font-size:.72rem">
+<span class="cm"># openapi.yaml – a "simple" endpoint</span>
+paths:
+  /pets/{id}:
+    get:
+      summary: Get a pet by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A pet object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pet'
+        '404':
+          description: Not found
+
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        age:
+          type: integer
+      </pre>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <h3>😩 Verbosity</h3>
+          <p>20+ lines to describe one GET endpoint. Real APIs have hundreds.</p>
+        </div>
+        <div class="card">
+          <h3>🔁 Duplication</h3>
+          <p>Every shared model must be repeated or referenced with fragile <code>$ref</code> strings.</p>
+        </div>
+        <div class="card">
+          <h3>🧩 No abstraction</h3>
+          <p>No generics, no inheritance, no templates. Copy-paste is the "pattern".</p>
+        </div>
+        <div class="card">
+          <h3>🤯 Hard to review</h3>
+          <p>Large YAML files are unreadable in PRs and nearly impossible to diff.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 3 – More pain points
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s3">
+    <div class="slide-label">The Problem</div>
+    <h2>More Pain Points at Scale</h2>
+    <div class="cols cols-3" style="flex:1;align-items:start">
+      <div class="card">
+        <div class="badge badge-red" style="margin-bottom:6px">Consistency</div>
+        <p>10 teams → 10 different naming conventions, error shapes, pagination styles. No enforced standard.</p>
+      </div>
+      <div class="card">
+        <div class="badge badge-red" style="margin-bottom:6px">Multi-protocol</div>
+        <p>OpenAPI only covers REST. gRPC, AsyncAPI, JSON Schema need completely separate files.</p>
+      </div>
+      <div class="card">
+        <div class="badge badge-red" style="margin-bottom:6px">Tooling drift</div>
+        <p>Generated clients get out of sync. Different validators disagree on the same spec. Breaking changes slip through.</p>
+      </div>
+      <div class="card">
+        <div class="badge badge-red" style="margin-bottom:6px">No type safety</div>
+        <p>YAML/JSON is text. Typos in <code>$ref</code>, wrong types, missing fields — all caught only at runtime.</p>
+      </div>
+      <div class="card">
+        <div class="badge badge-red" style="margin-bottom:6px">Version sprawl</div>
+        <p>OpenAPI 2 vs 3.0 vs 3.1 — incompatibilities everywhere. Swagger UI, ReDoc, Redocly all behave differently.</p>
+      </div>
+      <div class="card">
+        <div class="badge badge-red" style="margin-bottom:6px">Scaling</div>
+        <p>Microsoft's Azure REST APIs: <strong>thousands</strong> of endpoints. Managing raw OpenAPI at that scale is untenable.</p>
+      </div>
+    </div>
+    <p class="muted">💡 TypeSpec was born from exactly this pain — at Microsoft, managing the Azure API surface.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 4 – Section divider: What is TypeSpec
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide section-slide" id="s4">
+    <div class="big-icon">🔷</div>
+    <h2>What is TypeSpec?</h2>
+    <p class="subtitle" style="max-width:500px;margin:0 auto">A language for describing APIs — not just documenting them</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 5 – TypeSpec overview
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s5">
+    <div class="slide-label">What is TypeSpec</div>
+    <h2>TypeSpec at a Glance</h2>
+    <div class="cols cols-2" style="flex:1;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <p>TypeSpec is an <strong>open-source, Microsoft-built language</strong> for describing cloud service APIs and shapes — then <em>generating</em> everything from that single source.</p>
+        <ul class="emoji-list">
+          <li><span class="em">🧠</span><span>Strongly-typed, compiler-verified API definition language</span></li>
+          <li><span class="em">⚙️</span><span>Compiles to OpenAPI 3, JSON Schema, Protobuf, and more</span></li>
+          <li><span class="em">🔌</span><span>Extensible via libraries and custom emitters</span></li>
+          <li><span class="em">🏭</span><span>Used internally at Microsoft to define the entire Azure API surface</span></li>
+          <li><span class="em">🌐</span><span>Open source at <code>github.com/microsoft/typespec</code></span></li>
+        </ul>
+        <div class="badge badge-blue" style="width:fit-content">typespec.io</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" style="border-color: var(--accent)">
+          <h3>The Core Idea</h3>
+          <p>Write your API once in TypeSpec.<br/>
+          Let the compiler produce OpenAPI, JSON Schema, docs, and client SDKs.</p>
+        </div>
+        <div class="card">
+          <h3>Inspired by TypeScript</h3>
+          <p>Familiar syntax. If you know TypeScript, TypeSpec feels immediately natural.</p>
+        </div>
+        <div class="card">
+          <h3>Not a runtime framework</h3>
+          <p>TypeSpec is a <em>design-time</em> tool. It doesn't run your API — it defines its contract.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 6 – Code-First approach
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s6">
+    <div class="slide-label">Approach</div>
+    <h2>The "Code-First" Approach with TypeSpec</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <p>Traditional approaches to API design:</p>
+        <div class="card">
+          <span class="badge badge-yellow">Design-First (old style)</span>
+          <p style="margin-top:8px">Write YAML/JSON OpenAPI spec by hand → implement server → hope they stay in sync.</p>
+        </div>
+        <div class="card">
+          <span class="badge badge-yellow">Code-First (old style)</span>
+          <p style="margin-top:8px">Write server code → annotate with attributes → generate OpenAPI. Spec is a by-product, often imperfect.</p>
+        </div>
+        <div class="card" style="border-color:var(--green)">
+          <span class="badge badge-green">TypeSpec Code-First</span>
+          <p style="margin-top:8px">Write <strong>TypeSpec</strong> — a real programming language. Compile → get perfect, consistent OpenAPI (and more). The spec <em>is</em> the source of truth.</p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <h3>Why Code-First with TypeSpec wins</h3>
+        <ul>
+          <li>Refactor-safe: rename a model, everywhere updates</li>
+          <li>IDE support: autocomplete, go-to-definition, error squiggles</li>
+          <li>Reuse via imports, templates, libraries</li>
+          <li>Version control friendly: small, readable diffs</li>
+          <li>Enforces API style through shared libraries (like linting)</li>
+          <li>One input → multiple outputs (OpenAPI, Protobuf, docs…)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 7 – Section divider: Core Syntax
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide section-slide" id="s7">
+    <div class="big-icon">✍️</div>
+    <h2>Core Syntax Features</h2>
+    <p class="subtitle">TypeSpec vs OpenAPI — side by side</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 8 – Models vs OpenAPI schemas
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s8">
+    <div class="slide-label">Core Syntax – Models</div>
+    <h2>Models → OpenAPI Schemas</h2>
+    <div class="cols cols-2">
+      <div>
+        <p class="muted" style="margin-bottom:8px">TypeSpec</p>
+        <pre>
+<span class="kw">model</span> <span class="ty">Pet</span> {
+  <span class="prop">id</span>:   <span class="kw">string</span>;
+  <span class="prop">name</span>: <span class="kw">string</span>;
+  <span class="prop">age</span>?: <span class="kw">uint8</span> = <span class="nu">0</span>;
+  <span class="prop">kind</span>: <span class="st">"cat"</span> | <span class="st">"dog"</span> | <span class="st">"bird"</span>;
+}
+
+<span class="kw">model</span> <span class="ty">Dog</span> <span class="kw">extends</span> <span class="ty">Pet</span> {
+  <span class="prop">breed</span>: <span class="kw">string</span>;
+}</pre>
+      </div>
+      <div>
+        <p class="muted" style="margin-bottom:8px">Equivalent OpenAPI 3</p>
+        <pre style="font-size:.72rem">
+components:
+  schemas:
+    Pet:
+      type: object
+      required: [id, name, kind]
+      properties:
+        id:   { type: string }
+        name: { type: string }
+        age:
+          type: integer
+          format: uint8
+          default: 0
+        kind:
+          type: string
+          enum: [cat, dog, bird]
+    Dog:
+      allOf:
+        - $ref: '#/components/schemas/Pet'
+        - type: object
+          required: [breed]
+          properties:
+            breed: { type: string }
+        </pre>
+      </div>
+    </div>
+    <p class="muted">TypeSpec: <strong>8 lines</strong> &nbsp;|&nbsp; OpenAPI YAML: <strong>22 lines</strong> — and TypeSpec is statically checked.</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 9 – Operations vs paths
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s9">
+    <div class="slide-label">Core Syntax – Operations</div>
+    <h2>Operations → OpenAPI Paths</h2>
+    <div class="cols cols-2">
+      <div>
+        <p class="muted" style="margin-bottom:8px">TypeSpec</p>
+        <pre>
+<span class="kw">import</span> <span class="st">"@typespec/http"</span>;
+<span class="kw">using</span> TypeSpec.Http;
+
+<span class="ty">@route</span>(<span class="st">"/pets"</span>)
+<span class="kw">namespace</span> <span class="ty">Pets</span> {
+
+  <span class="ty">@get</span>
+  <span class="kw">op</span> <span class="fn">listPets</span>(): <span class="ty">Pet</span>[];
+
+  <span class="ty">@post</span>
+  <span class="kw">op</span> <span class="fn">createPet</span>(<span class="ty">@body</span> pet: <span class="ty">Pet</span>): <span class="ty">Pet</span>;
+
+  <span class="ty">@get</span> <span class="ty">@route</span>(<span class="st">"/{id}"</span>)
+  <span class="kw">op</span> <span class="fn">getPet</span>(<span class="ty">@path</span> id: <span class="kw">string</span>):
+    <span class="ty">Pet</span> | <span class="ty">NotFoundError</span>;
+
+  <span class="ty">@delete</span> <span class="ty">@route</span>(<span class="st">"/{id}"</span>)
+  <span class="kw">op</span> <span class="fn">deletePet</span>(<span class="ty">@path</span> id: <span class="kw">string</span>): <span class="kw">void</span>;
+}</pre>
+      </div>
+      <div>
+        <p class="muted" style="margin-bottom:8px">Generated OpenAPI (abbreviated)</p>
+        <pre style="font-size:.72rem">
+paths:
+  /pets:
+    get:
+      operationId: listPets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Pet'
+    post:
+      operationId: createPet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pet'
+      responses:
+        '200': ...
+  /pets/{id}:
+    get:  ...
+    delete: ...</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 10 – Decorators
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s10">
+    <div class="slide-label">Core Syntax – Decorators</div>
+    <h2>Decorators — Metadata as First-Class Citizens</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p style="margin-bottom:10px">Decorators attach HTTP, validation, and documentation metadata directly to types.</p>
+        <pre>
+<span class="ty">@doc</span>(<span class="st">"A registered pet"</span>)
+<span class="kw">model</span> <span class="ty">Pet</span> {
+  <span class="ty">@doc</span>(<span class="st">"Unique identifier"</span>)
+  <span class="ty">@key</span>
+  <span class="prop">id</span>: <span class="kw">string</span>;
+
+  <span class="ty">@minLength</span>(<span class="nu">1</span>) <span class="ty">@maxLength</span>(<span class="nu">50</span>)
+  <span class="prop">name</span>: <span class="kw">string</span>;
+
+  <span class="ty">@minValue</span>(<span class="nu">0</span>) <span class="ty">@maxValue</span>(<span class="nu">30</span>)
+  <span class="prop">age</span>?: <span class="kw">uint8</span>;
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h3>Common built-in decorators</h3>
+        <table>
+          <thead><tr><th>Decorator</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td><code>@doc</code></td><td>description in generated spec</td></tr>
+            <tr><td><code>@route</code></td><td>URL path segment</td></tr>
+            <tr><td><code>@get @post @put @delete @patch</code></td><td>HTTP verb</td></tr>
+            <tr><td><code>@path @query @header @body @cookie</code></td><td>parameter location</td></tr>
+            <tr><td><code>@minLength @maxLength</code></td><td>string constraints</td></tr>
+            <tr><td><code>@minValue @maxValue</code></td><td>numeric constraints</td></tr>
+            <tr><td><code>@format</code></td><td>e.g. "uuid", "date-time"</td></tr>
+            <tr><td><code>@key</code></td><td>marks the resource identifier</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 11 – Interfaces & Namespaces
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s11">
+    <div class="slide-label">Core Syntax – Interfaces</div>
+    <h2>Interfaces &amp; Namespaces — Organise at Scale</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Grouping operations with <code>interface</code></p>
+        <pre>
+<span class="ty">@route</span>(<span class="st">"/pets"</span>)
+<span class="kw">interface</span> <span class="ty">PetsService</span> {
+  <span class="ty">@get</span>
+  <span class="kw">op</span> <span class="fn">list</span>(): <span class="ty">Pet</span>[];
+
+  <span class="ty">@post</span>
+  <span class="kw">op</span> <span class="fn">create</span>(<span class="ty">@body</span> b: <span class="ty">CreatePetRequest</span>):
+    <span class="ty">Pet</span>;
+}
+
+<span class="cm">// Separate namespace for admin routes</span>
+<span class="ty">@route</span>(<span class="st">"/admin"</span>)
+<span class="kw">namespace</span> <span class="ty">Admin</span> {
+  <span class="ty">@get</span> <span class="ty">@route</span>(<span class="st">"/pets"</span>)
+  <span class="kw">op</span> <span class="fn">listAll</span>(): <span class="ty">Pet</span>[];
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card">
+          <h3>namespace</h3>
+          <p>Logical grouping. Translates to a path prefix. Nestable. Mirrors how large API surfaces are split into domains.</p>
+        </div>
+        <div class="card">
+          <h3>interface</h3>
+          <p>Groups a set of operations that share behaviour or a resource. Can be extended or referenced from templates — just like an interface in OO languages.</p>
+        </div>
+        <div class="card">
+          <h3>Combining both</h3>
+          <p>Real APIs: namespace per domain (Users, Orders, Products), interface per resource within the domain.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 12 – Templates / Generics
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s12">
+    <div class="slide-label">Core Syntax – Templates</div>
+    <h2>Templates — Generics for APIs</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Define once, use for every resource</p>
+        <pre>
+<span class="cm">// Generic paged response</span>
+<span class="kw">model</span> <span class="ty">Page</span>&lt;<span class="ty">T</span>&gt; {
+  <span class="prop">items</span>: <span class="ty">T</span>[];
+  <span class="prop">nextLink</span>?: <span class="kw">string</span>;
+  <span class="prop">totalCount</span>: <span class="kw">int32</span>;
+}
+
+<span class="cm">// Generic CRUD interface</span>
+<span class="kw">interface</span> <span class="ty">CrudOps</span>&lt;<span class="ty">TResource</span>, <span class="ty">TCreate</span>&gt; {
+  <span class="ty">@get</span>    <span class="kw">op</span> <span class="fn">list</span>(): <span class="ty">Page</span>&lt;<span class="ty">TResource</span>&gt;;
+  <span class="ty">@post</span>   <span class="kw">op</span> <span class="fn">create</span>(<span class="ty">@body</span> b: <span class="ty">TCreate</span>): <span class="ty">TResource</span>;
+  <span class="ty">@get</span>   <span class="ty">@route</span>(<span class="st">"/{id}"</span>)
+          <span class="kw">op</span> <span class="fn">read</span>(<span class="ty">@path</span> id: <span class="kw">string</span>): <span class="ty">TResource</span>;
+}
+
+<span class="cm">// Instantiate for concrete resources</span>
+<span class="ty">@route</span>(<span class="st">"/pets"</span>)
+<span class="kw">interface</span> <span class="ty">Pets</span> <span class="kw">extends</span> <span class="ty">CrudOps</span>&lt;<span class="ty">Pet</span>, <span class="ty">CreatePet</span>&gt; {}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card" style="border-color:var(--green)">
+          <h3>Zero duplication</h3>
+          <p>10 resources → 10 one-liner interfaces. All pagination, error handling, and CRUD shapes defined <em>once</em>.</p>
+        </div>
+        <div class="card">
+          <h3>Compiler-checked</h3>
+          <p>If you forget a field in a model passed to the template, you get a compile error — not a broken spec.</p>
+        </div>
+        <div class="card">
+          <h3>OpenAPI has no equivalent</h3>
+          <p>Raw OpenAPI forces copy-paste for every resource. TypeSpec's templates are a <em>transformative</em> advantage.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 13 – Error handling & Unions
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s13">
+    <div class="slide-label">Core Syntax – Unions &amp; Errors</div>
+    <h2>Union Types &amp; Structured Error Responses</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <pre>
+<span class="cm">// Standard error envelope</span>
+<span class="kw">model</span> <span class="ty">ApiError</span> {
+  <span class="prop">code</span>:    <span class="kw">string</span>;
+  <span class="prop">message</span>: <span class="kw">string</span>;
+}
+
+<span class="ty">@error</span>
+<span class="kw">model</span> <span class="ty">NotFound</span>    <span class="kw">is</span> <span class="ty">ApiError</span>;
+<span class="ty">@error</span>
+<span class="kw">model</span> <span class="ty">Unauthorized</span> <span class="kw">is</span> <span class="ty">ApiError</span>;
+<span class="ty">@error</span>
+<span class="kw">model</span> <span class="ty">Conflict</span>     <span class="kw">is</span> <span class="ty">ApiError</span>;
+
+<span class="cm">// Return type is a union</span>
+<span class="kw">op</span> <span class="fn">getPet</span>(<span class="ty">@path</span> id: <span class="kw">string</span>):
+  <span class="ty">Pet</span> | <span class="ty">NotFound</span> | <span class="ty">Unauthorized</span>;</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card">
+          <h3>Union types</h3>
+          <p>Operations can return multiple response types. TypeSpec maps each to the appropriate HTTP status code automatically when combined with <code>@statusCode</code>.</p>
+        </div>
+        <div class="card">
+          <h3><code>@error</code> decorator</h3>
+          <p>Marks a model as an error response. The emitter knows to map it to <code>4xx</code>/<code>5xx</code> status codes in OpenAPI.</p>
+        </div>
+        <div class="card">
+          <h3>Consistent errors, always</h3>
+          <p>Define <code>ApiError</code> once in a shared library. Every team, every service uses the same error shape — enforced by the compiler.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 14 – Scalars & Enums
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s14">
+    <div class="slide-label">Core Syntax – Scalars &amp; Enums</div>
+    <h2>Scalars, Enums &amp; Type Aliases</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Custom scalars (branded types)</p>
+        <pre>
+<span class="cm">// Extend built-in scalars</span>
+<span class="ty">@format</span>(<span class="st">"uuid"</span>)
+<span class="kw">scalar</span> <span class="ty">Uuid</span> <span class="kw">extends</span> <span class="kw">string</span>;
+
+<span class="ty">@minLength</span>(<span class="nu">1</span>) <span class="ty">@maxLength</span>(<span class="nu">255</span>)
+<span class="kw">scalar</span> <span class="ty">NonEmptyString</span> <span class="kw">extends</span> <span class="kw">string</span>;
+
+<span class="cm">// Enums</span>
+<span class="kw">enum</span> <span class="ty">PetKind</span> {
+  Cat: <span class="st">"cat"</span>,
+  Dog: <span class="st">"dog"</span>,
+  Bird: <span class="st">"bird"</span>,
+}
+
+<span class="kw">model</span> <span class="ty">Pet</span> {
+  <span class="prop">id</span>:   <span class="ty">Uuid</span>;
+  <span class="prop">name</span>: <span class="ty">NonEmptyString</span>;
+  <span class="prop">kind</span>: <span class="ty">PetKind</span>;
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card">
+          <h3>Scalars</h3>
+          <p>Create domain-specific types that carry validation rules. Use <code>Uuid</code> everywhere → impossible to accidentally pass a bare string.</p>
+        </div>
+        <div class="card">
+          <h3>Enums</h3>
+          <p>Named, strongly-typed enumerations. Compile to OpenAPI <code>enum</code> arrays. IDE gives you autocomplete on enum values.</p>
+        </div>
+        <div class="card">
+          <h3>vs OpenAPI</h3>
+          <p>OpenAPI has no custom scalars. You'd have to copy <code>format: "uuid"</code> and <code>minLength: 1</code> onto every single field. Forever.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 15 – Comparison table
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s15">
+    <div class="slide-label">Summary</div>
+    <h2>TypeSpec vs OpenAPI — Feature Comparison</h2>
+    <table style="margin-top:10px">
+      <thead>
+        <tr><th>Feature</th><th>Raw OpenAPI YAML</th><th>TypeSpec</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Strongly typed</td><td class="no">✗ Text/YAML</td><td class="yes">✓ Compiler-checked</td></tr>
+        <tr><td>Generics / Templates</td><td class="no">✗ None</td><td class="yes">✓ Full generic syntax</td></tr>
+        <tr><td>Inheritance</td><td>⚠ <code>allOf</code> workaround</td><td class="yes">✓ <code>extends</code>, <code>is</code></td></tr>
+        <tr><td>Custom scalar types</td><td class="no">✗ Copy-paste constraints</td><td class="yes">✓ <code>scalar</code> keyword</td></tr>
+        <tr><td>IDE support</td><td>⚠ Schema-based only</td><td class="yes">✓ Full LSP (VS Code / VS)</td></tr>
+        <tr><td>Multi-protocol output</td><td class="no">✗ REST only</td><td class="yes">✓ OpenAPI, Protobuf, JSON Schema…</td></tr>
+        <tr><td>Reusable libraries</td><td class="no">✗ Copy files</td><td class="yes">✓ npm packages</td></tr>
+        <tr><td>Readability at scale</td><td class="no">✗ Thousands of lines YAML</td><td class="yes">✓ Concise, modular</td></tr>
+        <tr><td>Versioning support</td><td>⚠ Manual</td><td class="yes">✓ <code>@typespec/versioning</code> library</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 16 – Section divider: Ecosystem
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide section-slide" id="s16">
+    <div class="big-icon">🌐</div>
+    <h2>The TypeSpec Ecosystem</h2>
+    <p class="subtitle">Libraries, emitters, tooling, and integrations</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 17 – Ecosystem overview
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s17">
+    <div class="slide-label">Ecosystem</div>
+    <h2>Official Libraries</h2>
+    <div class="cols cols-3" style="flex:1;align-items:start;font-size:.9rem">
+      <div class="card">
+        <span class="badge badge-blue">@typespec/http</span>
+        <p style="margin-top:8px">HTTP routing decorators: <code>@route</code>, <code>@get</code>, <code>@post</code>, <code>@body</code>, <code>@path</code>, <code>@query</code>, <code>@header</code></p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">@typespec/rest</span>
+        <p style="margin-top:8px">REST resource patterns: <code>Resource</code>, <code>CollectionWithNextLink</code>. Builds on <code>@typespec/http</code>.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-blue">@typespec/openapi3</span>
+        <p style="margin-top:8px">Emitter that produces OpenAPI 3.0/3.1 YAML or JSON from your TypeSpec.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-purple">@typespec/versioning</span>
+        <p style="margin-top:8px">Declare API versions. Mark properties as added/removed in specific versions. Generates per-version OpenAPI.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-purple">@typespec/json-schema</span>
+        <p style="margin-top:8px">Emit pure JSON Schema from TypeSpec models — useful for message validation, config schemas.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-purple">@typespec/protobuf</span>
+        <p style="margin-top:8px">Emit <code>.proto</code> files for gRPC services from the same TypeSpec source.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-green">@azure-tools/typespec-azure-core</span>
+        <p style="margin-top:8px">Azure-specific patterns. Used internally at Microsoft to define the entire Azure REST API surface.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-green">@typespec/compiler</span>
+        <p style="margin-top:8px">The core compiler. Provides the LSP server, CLI (<code>tsp</code>), formatter, and extension APIs.</p>
+      </div>
+      <div class="card">
+        <span class="badge badge-yellow">Community</span>
+        <p style="margin-top:8px">Growing ecosystem of community emitters, linters, and style libraries published on npm.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 18 – Tooling
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s18">
+    <div class="slide-label">Ecosystem – Tooling</div>
+    <h2>Developer Tooling</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <h3>VS Code Extension</h3>
+          <p>Full Language Server Protocol support: syntax highlighting, autocomplete, go-to-definition, inline errors, hover docs, formatter.</p>
+        </div>
+        <div class="card">
+          <h3>Visual Studio Extension</h3>
+          <p>Same LSP features for the .NET ecosystem.</p>
+        </div>
+        <div class="card">
+          <h3>TypeSpec Playground</h3>
+          <p>Online editor at <code>typespec.io/playground</code> — write TypeSpec, see OpenAPI output instantly. No install needed. Great for demos.</p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <h3>CLI — <code>tsp</code></h3>
+          <pre style="font-size:.75rem">
+<span class="cm"># Scaffold a new project</span>
+tsp init
+
+<span class="cm"># Compile & emit</span>
+tsp compile .
+
+<span class="cm"># Watch mode</span>
+tsp compile . --watch
+
+<span class="cm"># Format all .tsp files</span>
+tsp format **/*.tsp</pre>
+        </div>
+        <div class="card">
+          <h3>tspconfig.yaml</h3>
+          <p>Controls which emitters run, output paths, compiler options — per-project, version-controlled.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 19 – Versioning showcase
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s19">
+    <div class="slide-label">Ecosystem – Versioning</div>
+    <h2>API Versioning — Built-In</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <pre>
+<span class="kw">import</span> <span class="st">"@typespec/versioning"</span>;
+<span class="kw">using</span> TypeSpec.Versioning;
+
+<span class="ty">@versioned</span>(Versions)
+<span class="kw">namespace</span> <span class="ty">PetStore</span> {
+
+  <span class="kw">enum</span> <span class="ty">Versions</span> { v1, v2 }
+
+  <span class="kw">model</span> <span class="ty">Pet</span> {
+    <span class="prop">id</span>:   <span class="kw">string</span>;
+    <span class="prop">name</span>: <span class="kw">string</span>;
+
+    <span class="cm">// Added in v2 — invisible in v1 spec</span>
+    <span class="ty">@added</span>(Versions.v2)
+    <span class="prop">microchipId</span>?: <span class="kw">string</span>;
+  }
+
+  <span class="cm">// Whole operation added in v2</span>
+  <span class="ty">@added</span>(Versions.v2)
+  <span class="ty">@get</span> <span class="ty">@route</span>(<span class="st">"/pets/microchip/{id}"</span>)
+  <span class="kw">op</span> <span class="fn">findByMicrochip</span>(<span class="ty">@path</span> id: <span class="kw">string</span>): <span class="ty">Pet</span>;
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card" style="border-color:var(--green)">
+          <h3>One source — multiple versions</h3>
+          <p>The emitter generates a <em>separate</em> OpenAPI file per version. The diff between versions is tracked in the TypeSpec source.</p>
+        </div>
+        <div class="card">
+          <h3>Available annotations</h3>
+          <ul>
+            <li><code>@added(version)</code> — when a field/op appeared</li>
+            <li><code>@removed(version)</code> — when deprecated/removed</li>
+            <li><code>@renamedFrom(version, oldName)</code></li>
+            <li><code>@madeOptional(version)</code></li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>vs OpenAPI</h3>
+          <p>Raw OpenAPI: maintain two completely separate, manually synced YAML files. TypeSpec: single file, compiler does the rest.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 20 – The big picture
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s20">
+    <div class="slide-label">Ecosystem – Big Picture</div>
+    <h2>TypeSpec in the Wider Stack</h2>
+    <div style="display:flex;flex-direction:column;gap:16px;flex:1">
+      <div class="cols cols-3">
+        <div class="card" style="text-align:center">
+          <div style="font-size:2rem">✍️</div>
+          <h3>Input</h3>
+          <p><code>.tsp</code> files<br/>Shared libraries<br/>tspconfig.yaml</p>
+        </div>
+        <div class="card" style="text-align:center;border-color:var(--accent)">
+          <div style="font-size:2rem">⚙️</div>
+          <h3>TypeSpec Compiler</h3>
+          <p>Type checking<br/>Decorator resolution<br/>Emitter pipeline</p>
+        </div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:2rem">📤</div>
+          <h3>Outputs</h3>
+          <p>OpenAPI 3.x YAML<br/>JSON Schema<br/>.proto (gRPC)<br/>Docs, SDK stubs</p>
+        </div>
+      </div>
+      <div class="cols cols-2">
+        <div class="card">
+          <h3>Downstream from OpenAPI</h3>
+          <p>Once you have a clean, TypeSpec-generated OpenAPI spec you can use the full existing ecosystem: <strong>Swagger UI</strong>, <strong>Redocly</strong>, <strong>AutoRest</strong>, <strong>Kiota</strong>, <strong>NSwag</strong>, <strong>OpenAPI Generator</strong> for client SDKs in any language.</p>
+        </div>
+        <div class="card">
+          <h3>Azure &amp; Microsoft adoption</h3>
+          <p>TypeSpec is the <em>canonical</em> way to define Azure REST APIs. The Azure SDK team uses it to generate SDKs for .NET, Java, Python, JavaScript, Go automatically from the same TypeSpec source.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 21 – Key Takeaways
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s21">
+    <div class="slide-label">Summary</div>
+    <h2>Key Takeaways</h2>
+    <div class="cols cols-2" style="flex:1">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" style="border-left: 3px solid var(--red)">
+          <h3>The problem</h3>
+          <p>Raw OpenAPI YAML is verbose, fragile, doesn't scale, and forces copy-paste patterns across teams.</p>
+        </div>
+        <div class="card" style="border-left: 3px solid var(--accent)">
+          <h3>What TypeSpec is</h3>
+          <p>A strongly-typed, compiler-checked language that generates OpenAPI and more from a clean, concise source.</p>
+        </div>
+        <div class="card" style="border-left: 3px solid var(--accent2)">
+          <h3>Code-first done right</h3>
+          <p>The TypeSpec file is the source of truth — not the generated YAML. Refactoring, versioning, and consistency become trivial.</p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" style="border-left: 3px solid var(--green)">
+          <h3>Killer features</h3>
+          <p>Generics/templates, custom scalars, decorators, built-in versioning, multi-protocol output.</p>
+        </div>
+        <div class="card" style="border-left: 3px solid var(--yellow)">
+          <h3>Ecosystem</h3>
+          <p>Official emitters for OpenAPI, JSON Schema, Protobuf. VS Code extension with full IDE support. Growing npm ecosystem.</p>
+        </div>
+        <div class="card" style="border-left: 3px solid var(--green)">
+          <h3>Start today</h3>
+          <pre style="font-size:.8rem;background:transparent;border:none;padding:0">
+npm install -g @typespec/compiler
+tsp init   <span class="cm"># pick "Generic REST API"</span>
+tsp compile .</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 22 – Hands-On Section divider
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide section-slide" id="s22">
+    <div class="big-icon">🖥️</div>
+    <h2>Hands-On Demo</h2>
+    <p class="subtitle">Building a Pet Store API from scratch</p>
+    <div class="badge badge-green" style="margin: 0 auto">Live coding in VS Code</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 23 – Hands-on Step 1
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s23">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 1</div>
+        <h2>Project Setup</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="step-list">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Install the TypeSpec compiler globally:<br/><code>npm install -g @typespec/compiler</code></div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Install the <strong>TypeSpec for VS Code</strong> extension from the marketplace.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">Create a new project folder and run:<br/><code>tsp init</code></div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">Select the <strong>Generic REST API</strong> template.<br/>Make sure <code>@typespec/http</code> and <code>@typespec/openapi3</code> are selected.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-body">Open the folder in VS Code.<br/>Show the generated <code>main.tsp</code> and <code>tspconfig.yaml</code>.</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="muted" style="margin-bottom:8px">Generated tspconfig.yaml</p>
+        <pre>
+emit:
+  - "@typespec/openapi3"
+
+options:
+  "@typespec/openapi3":
+    output-file: openapi.yaml</pre>
+        <p class="muted" style="margin-top:12px;margin-bottom:8px">Compile and inspect output</p>
+        <pre>
+tsp compile .
+<span class="cm"># → tsp-output/@typespec/openapi3/openapi.yaml</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 24 – Hands-on Step 2
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s24">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 2</div>
+        <h2>Define Your First Model</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Replace <code>main.tsp</code> with:</p>
+        <pre>
+<span class="kw">import</span> <span class="st">"@typespec/http"</span>;
+<span class="kw">using</span> TypeSpec.Http;
+
+<span class="ty">@service</span>({ <span class="prop">title</span>: <span class="st">"Pet Store API"</span> })
+<span class="kw">namespace</span> <span class="ty">PetStore</span>;
+
+<span class="kw">model</span> <span class="ty">Pet</span> {
+  <span class="ty">@doc</span>(<span class="st">"Unique pet identifier"</span>)
+  <span class="prop">id</span>: <span class="kw">string</span>;
+
+  <span class="ty">@minLength</span>(<span class="nu">1</span>)
+  <span class="prop">name</span>: <span class="kw">string</span>;
+
+  <span class="prop">kind</span>: <span class="st">"cat"</span> | <span class="st">"dog"</span> | <span class="st">"bird"</span>;
+  <span class="prop">age</span>?: <span class="kw">uint8</span>;
+}
+
+<span class="kw">model</span> <span class="ty">CreatePetRequest</span> {
+  <span class="ty">@minLength</span>(<span class="nu">1</span>)
+  <span class="prop">name</span>: <span class="kw">string</span>;
+
+  <span class="prop">kind</span>: <span class="st">"cat"</span> | <span class="st">"dog"</span> | <span class="st">"bird"</span>;
+  <span class="prop">age</span>?: <span class="kw">uint8</span>;
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <h3>Things to show</h3>
+          <ul>
+            <li>Autocomplete on types (<code>uint8</code> etc.)</li>
+            <li>Hover over <code>@minLength</code> to see docs</li>
+            <li>Introduce a type error — see red squiggle</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Compile &amp; inspect</h3>
+          <p>Run <code>tsp compile .</code> and open the generated <code>openapi.yaml</code>.<br/>Show the <code>components/schemas</code> section.</p>
+        </div>
+        <div class="card">
+          <h3>Tip</h3>
+          <p>Use <code>tsp compile . --watch</code> for live output while editing.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 25 – Hands-on Step 3
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s25">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 3</div>
+        <h2>Add CRUD Operations</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Add below the models in <code>main.tsp</code>:</p>
+        <pre>
+<span class="ty">@route</span>(<span class="st">"/pets"</span>)
+<span class="kw">interface</span> <span class="ty">Pets</span> {
+
+  <span class="ty">@get</span>
+  <span class="kw">op</span> <span class="fn">listPets</span>(): <span class="ty">Pet</span>[];
+
+  <span class="ty">@post</span>
+  <span class="kw">op</span> <span class="fn">createPet</span>(
+    <span class="ty">@body</span> body: <span class="ty">CreatePetRequest</span>
+  ): <span class="ty">Pet</span>;
+
+  <span class="ty">@get</span> <span class="ty">@route</span>(<span class="st">"/{id}"</span>)
+  <span class="kw">op</span> <span class="fn">getPet</span>(<span class="ty">@path</span> id: <span class="kw">string</span>): <span class="ty">Pet</span>;
+
+  <span class="ty">@put</span> <span class="ty">@route</span>(<span class="st">"/{id}"</span>)
+  <span class="kw">op</span> <span class="fn">updatePet</span>(
+    <span class="ty">@path</span> id: <span class="kw">string</span>,
+    <span class="ty">@body</span> body: <span class="ty">CreatePetRequest</span>
+  ): <span class="ty">Pet</span>;
+
+  <span class="ty">@delete</span> <span class="ty">@route</span>(<span class="st">"/{id}"</span>)
+  <span class="kw">op</span> <span class="fn">deletePet</span>(<span class="ty">@path</span> id: <span class="kw">string</span>): <span class="kw">void</span>;
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <h3>What to show</h3>
+          <ul>
+            <li>Recompile and show generated <code>paths</code> in OpenAPI</li>
+            <li>Count lines: ~30 TypeSpec vs ~120 OpenAPI YAML</li>
+            <li>Open <a href="https://typespec.io/playground" style="color:var(--accent)">typespec.io/playground</a> — paste the code, see output live</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Discussion point</h3>
+          <p>What if you need to add <code>@query</code> filter params to <code>listPets</code>? Show how simple it is vs editing raw YAML.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 26 – Hands-on Step 4
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s26">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 4</div>
+        <h2>Add Error Handling</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Add error models &amp; update operations</p>
+        <pre>
+<span class="ty">@error</span>
+<span class="kw">model</span> <span class="ty">NotFoundError</span> {
+  <span class="ty">@statusCode</span> <span class="prop">code</span>: <span class="nu">404</span>;
+  <span class="prop">message</span>: <span class="kw">string</span>;
+}
+
+<span class="ty">@error</span>
+<span class="kw">model</span> <span class="ty">ValidationError</span> {
+  <span class="ty">@statusCode</span> <span class="prop">code</span>: <span class="nu">400</span>;
+  <span class="prop">message</span>: <span class="kw">string</span>;
+  <span class="prop">fields</span>: <span class="kw">string</span>[];
+}
+
+<span class="cm">// Update getPet to return union</span>
+<span class="ty">@get</span> <span class="ty">@route</span>(<span class="st">"/{id}"</span>)
+<span class="kw">op</span> <span class="fn">getPet</span>(<span class="ty">@path</span> id: <span class="kw">string</span>):
+  <span class="ty">Pet</span> | <span class="ty">NotFoundError</span>;
+
+<span class="cm">// Update createPet</span>
+<span class="ty">@post</span>
+<span class="kw">op</span> <span class="fn">createPet</span>(<span class="ty">@body</span> b: <span class="ty">CreatePetRequest</span>):
+  <span class="ty">Pet</span> | <span class="ty">ValidationError</span>;</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card">
+          <h3>Show in generated OpenAPI</h3>
+          <p>The union types map to separate <code>responses</code> entries with the correct HTTP status codes — automatically.</p>
+        </div>
+        <div class="card">
+          <h3>Consistency win</h3>
+          <p>Define <code>NotFoundError</code> once in a shared file. Import it everywhere. All 404s look the same across all endpoints.</p>
+        </div>
+        <div class="card">
+          <h3>Next step idea</h3>
+          <p>Extract models into a <code>models.tsp</code> file and use <code>import "./models.tsp"</code> to show modular project structure.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 27 – Hands-on Step 5
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s27">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 5</div>
+        <h2>Templates &amp; Reuse (Bonus)</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Introduce a reusable paged response</p>
+        <pre>
+<span class="cm">// shared/pagination.tsp</span>
+<span class="kw">model</span> <span class="ty">Page</span>&lt;<span class="ty">T</span>&gt; {
+  <span class="prop">items</span>: <span class="ty">T</span>[];
+  <span class="prop">totalCount</span>: <span class="kw">int32</span>;
+  <span class="prop">nextLink</span>?: <span class="kw">string</span>;
+}
+
+<span class="cm">// Update listPets in main.tsp</span>
+<span class="kw">import</span> <span class="st">"./shared/pagination.tsp"</span>;
+
+<span class="ty">@get</span>
+<span class="kw">op</span> <span class="fn">listPets</span>(
+  <span class="ty">@query</span> <span class="prop">skip</span>?: <span class="kw">int32</span>,
+  <span class="ty">@query</span> <span class="prop">top</span>?:  <span class="kw">int32</span>
+): <span class="ty">Page</span>&lt;<span class="ty">Pet</span>&gt;;</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="card" style="border-color:var(--green)">
+          <h3>The pay-off</h3>
+          <p>Add a second resource (e.g. <code>Owner</code>). The same <code>Page&lt;T&gt;</code> works instantly — zero duplication, compiler-verified.</p>
+        </div>
+        <div class="card">
+          <h3>Show the final OpenAPI</h3>
+          <p>Open the generated YAML. Highlight that a clean, production-grade spec was created with ~60 lines of readable TypeSpec.</p>
+        </div>
+        <div class="card">
+          <h3>Where to go next</h3>
+          <ul>
+            <li><code>tsp init</code> with Azure template</li>
+            <li>Add <code>@typespec/versioning</code></li>
+            <li>Publish shared types as an npm package</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 28 – Q&A / Resources
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s28">
+    <div class="slide-label">Fin</div>
+    <h2>Resources &amp; Q&amp;A</h2>
+    <div class="cols cols-2" style="flex:1;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card">
+          <h3>🌐 Official site</h3>
+          <p><code>typespec.io</code></p>
+        </div>
+        <div class="card">
+          <h3>🎮 Playground</h3>
+          <p><code>typespec.io/playground</code></p>
+        </div>
+        <div class="card">
+          <h3>📦 GitHub</h3>
+          <p><code>github.com/microsoft/typespec</code></p>
+        </div>
+        <div class="card">
+          <h3>💬 Discord</h3>
+          <p><code>aka.ms/typespec/discord</code></p>
+        </div>
+        <div class="card">
+          <h3>📖 Docs</h3>
+          <p><code>typespec.io/docs</code></p>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="accent-bar"></div>
+        <h3 style="font-size:1.4rem;color:var(--text)">Thank you!</h3>
+        <p>TypeSpec gives your team a <strong>single source of truth</strong> for API contracts — expressive, refactor-safe, and capable of targeting multiple protocols from one definition.</p>
+        <p class="muted">Questions?</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- Progress bar -->
+<div id="progress-wrap"><div id="progress-bar"></div></div>
+
+<!-- Controls -->
+<div id="controls">
+  <button id="btn-prev" disabled>← Prev</button>
+  <span id="slide-counter">1 / 28</span>
+  <button id="btn-next">Next →</button>
+  <span style="color:var(--muted);font-size:.8rem;margin-left:20px">
+    ← → arrow keys also work &nbsp;|&nbsp; F for fullscreen
+  </span>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total   = slides.length;
+  let current   = 0;
+
+  const btnPrev    = document.getElementById('btn-prev');
+  const btnNext    = document.getElementById('btn-next');
+  const counter    = document.getElementById('slide-counter');
+  const progressBar= document.getElementById('progress-bar');
+
+  function showSlide(idx, dir = 1) {
+    const prev = slides[current];
+    prev.classList.remove('active');
+    prev.classList.add(dir >= 0 ? 'exit-left' : 'exit-right');
+    setTimeout(() => prev.classList.remove('exit-left', 'exit-right'), 400);
+
+    current = idx;
+    const next = slides[current];
+    next.scrollTop = 0;
+    next.style.transform = dir >= 0 ? 'translateX(60px)' : 'translateX(-60px)';
+    next.style.opacity   = '0';
+    next.style.display   = 'flex';
+    // Trigger reflow
+    void next.offsetWidth;
+    next.classList.add('active');
+    next.style.transform = '';
+    next.style.opacity   = '';
+
+    btnPrev.disabled = current === 0;
+    btnNext.disabled = current === total - 1;
+    counter.textContent = `${current + 1} / ${total}`;
+    progressBar.style.width = `${((current + 1) / total) * 100}%`;
+  }
+
+  btnNext.addEventListener('click', () => { if (current < total - 1) showSlide(current + 1, 1); });
+  btnPrev.addEventListener('click', () => { if (current > 0) showSlide(current - 1, -1); });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault();
+      if (current < total - 1) showSlide(current + 1, 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (current > 0) showSlide(current - 1, -1);
+    } else if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+
+  // Init progress
+  progressBar.style.width = `${(1 / total) * 100}%`;
+</script>
+</body>
+</html>
