@@ -1452,62 +1452,150 @@ tsp compile .
       </div>
     </div>
     <div class="cols cols-2" style="flex:1">
-      <div>
-        <p class="muted" style="margin-bottom:8px">Multiple emitters + linter rules in <code>tspconfig.yaml</code></p>
-        <pre style="font-size:.78rem">
-emit:
-  - "@typespec/openapi3"
-  - "@typespec/json-schema"
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <p class="muted">Step 1 — install packages (<code>@typespec/versioning</code> is a required peer dep)</p>
+        <pre style="font-size:.78rem">npm install @azure-tools/typespec-azure-core
+npm install @typespec/versioning</pre>
 
-options:
-  "@typespec/openapi3":
-    emitter-output-dir: "{output-dir}/schema"
-    openapi-versions:
-      - 3.1.0
-  "@typespec/json-schema":
-    emitter-output-dir: "{output-dir}/json-schema"
-
-linter:
+        <p class="muted">Step 2 — add both rulesets to <code>tspconfig.yaml</code></p>
+        <pre style="font-size:.78rem">linter:
   extends:
-    - "@typespec/http/all"
-  rules:
-    "@typespec/http/op-reference-container-route": "warn"</pre>
-        <p class="muted" style="margin-top:10px;margin-bottom:8px">Suppress a rule for one operation</p>
-        <pre style="font-size:.82rem">
-<span class="cm">// Opt-out for a single op with a reason</span>
-<span class="ty">#suppress</span> <span class="st">"@typespec/http/missing-uri-template"</span> <span class="st">"legacy route"</span>
+    - <span class="st">"@typespec/http/all"</span>          <span class="cm"># HTTP-specific rules</span>
+    - <span class="st">"@azure-tools/typespec-azure-core/all"</span>  <span class="cm"># Azure API Guidelines</span></pre>
+
+        <p class="muted">Step 3 — compile and see real warnings (44 on our Pet Store)</p>
+        <pre style="font-size:.76rem"><span class="cm">main.tsp:8 - warning documentation-required:</span>
+<span class="cm">  Model "Pet" must have a documentation comment.</span>
+<span class="cm">main.tsp:28 - warning documentation-required:</span>
+<span class="cm">  Operation "listPets" must have a @doc decorator.</span>
+<span class="cm">main.tsp:4 - warning require-versioned:</span>
+<span class="cm">  Namespace "PetStore" should use the @versioned decorator.</span>
+<span class="cm">main.tsp:17 - warning no-unnamed-union:</span>
+<span class="cm">  "cat"|"dog"|"bird" should be a named enum declaration.</span></pre>
+
+        <p class="muted">Step 4 — fix or suppress inline in <code>.tsp</code> (not in tspconfig!)</p>
+        <pre style="font-size:.78rem">
+<span class="cm">// ✅ Fix: add doc comment</span>
+<span class="ty">@doc</span>(<span class="st">"Returns all pets, paginated"</span>)
 <span class="ty">@get</span>
-<span class="kw">op</span> <span class="fn">search</span>(<span class="ty">@query</span> <span class="prop">q</span>: <span class="kw">string</span>): <span class="ty">Pet</span>[];</pre>
+<span class="kw">op</span> <span class="fn">listPets</span>(<span class="ty">@query</span> <span class="prop">skip</span>?: <span class="kw">int32</span>): <span class="ty">Page</span>&lt;<span class="ty">Pet</span>&gt;;
+
+<span class="cm">// ✅ Suppress one rule with a mandatory reason string</span>
+<span class="ty">#suppress</span> <span class="st">"@azure-tools/typespec-azure-core/require-versioned"</span> <span class="st">"demo only"</span>
+<span class="kw">namespace</span> <span class="ty">PetStore</span>;</pre>
       </div>
+
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="card">
-          <h3>Emitters</h3>
-          <p>Plugins that read the TypeSpec type graph and write output files. Every configured emitter runs in a single <code>tsp compile .</code> — one source, multiple artefacts.</p>
+        <div class="card" style="border-color:var(--accent2)">
+          <h3>Compiler vs Linter</h3>
+          <p><strong>Compiler</strong> — type errors. The spec won't generate at all.<br/><br/>
+          <strong>Linter</strong> — design quality. The spec generates but would be incomplete, ambiguous, or violate API guidelines. It's the difference between <em>"it works"</em> and <em>"it's correct"</em>.</p>
         </div>
         <div class="card">
-          <h3>Built-in lint rules</h3>
-          <ul style="font-size:.95rem">
-            <li><code>@typespec/http/all</code> activates all HTTP rules</li>
-            <li>Warns on missing <code>@doc</code>, ambiguous routes, duplicate ops</li>
-            <li>Errors on invalid unions and missing status codes</li>
-          </ul>
+          <h3>Real warnings from <code>azure-core/all</code></h3>
+          <table style="font-size:.85rem;margin-top:4px">
+            <thead><tr><th>Rule</th><th>What it flags</th></tr></thead>
+            <tbody>
+              <tr><td><code>documentation-required</code></td><td>Missing <code>@doc</code> on any model or op</td></tr>
+              <tr><td><code>require-versioned</code></td><td>No <code>@versioned</code> on namespace</td></tr>
+              <tr><td><code>auth-required</code></td><td>No <code>@useAuth</code> on service</td></tr>
+              <tr><td><code>no-unnamed-union</code></td><td>Inline union should be a named <code>enum</code></td></tr>
+              <tr><td><code>no-format</code></td><td><code>@format("uuid")</code> — use Azure scalars</td></tr>
+            </tbody>
+          </table>
         </div>
-        <div class="card">
-          <h3>Custom linters</h3>
-          <p>Write rules in TypeScript, publish as an npm package. Enforce team conventions: required decorators, naming patterns, forbidden scalar types — all compiler-checked.</p>
+        <div class="card" style="border-color:var(--yellow)">
+          <h3>⚠️ <code>rules:</code> in tspconfig.yaml does NOT work</h3>
+          <p>Per-rule overrides are <strong>not supported</strong> in <code>tspconfig.yaml</code> — the compiler errors. Silence individual rules with <code>#suppress</code> inline in the <code>.tsp</code> file only.</p>
         </div>
         <div class="card" style="border-color:var(--accent)">
           <h3>CI pipeline</h3>
-          <p><code>tsp compile .</code> exits <code>1</code> on any error. Drop it into GitHub Actions or Azure DevOps — broken specs can never merge.</p>
+          <p><code>tsp compile .</code> exits <code>1</code> on lint errors. Add it to GitHub Actions or Azure DevOps — design regressions can never merge.</p>
         </div>
       </div>
     </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SLIDE 30 – Alternative Solutions
+       SLIDE 30 – Hands-on Step 8: API Versioning
   ══════════════════════════════════════════════════════════════════ -->
   <div class="slide" id="s30">
+    <div class="hands-on-header">
+      <span class="icon-demo">🛠️</span>
+      <div>
+        <div class="slide-label">Hands-On — Step 8</div>
+        <h2>API Versioning</h2>
+      </div>
+    </div>
+    <div class="cols cols-2" style="flex:1">
+      <div>
+        <p class="muted" style="margin-bottom:8px">Install, then annotate your namespace &amp; model</p>
+        <pre style="font-size:.78rem">npm install @typespec/versioning</pre>
+        <pre>
+<span class="kw">import</span> <span class="st">"@typespec/versioning"</span>;
+<span class="kw">using</span> TypeSpec.Versioning;
+
+<span class="cm">// 1. Declare the supported versions</span>
+<span class="ty">@versioned</span>(Versions)
+<span class="ty">@service</span>(#{ <span class="prop">title</span>: <span class="st">"Pet Store API"</span> })
+<span class="kw">namespace</span> <span class="ty">PetStore</span> {
+
+  <span class="kw">enum</span> <span class="ty">Versions</span> { v1, v2 }
+
+  <span class="kw">model</span> <span class="ty">Pet</span> {
+    <span class="prop">id</span>:   <span class="ty">PetId</span>;
+    ...<span class="ty">PetBase</span>;
+
+    <span class="cm">// 2. Field added only in v2 — invisible in v1 spec</span>
+    <span class="ty">@added</span>(Versions.v2)
+    <span class="prop">microchipId</span>?: <span class="kw">string</span>;
+  }
+
+  <span class="cm">// 3. Whole operation added in v2</span>
+  <span class="ty">@added</span>(Versions.v2)
+  <span class="ty">@get</span> <span class="ty">@route</span>(<span class="st">"/pets/microchip/{id}"</span>)
+  <span class="kw">op</span> <span class="fn">findByMicrochip</span>(<span class="ty">@path</span> <span class="prop">id</span>: <span class="kw">string</span>): <span class="ty">Pet</span>;
+
+  <span class="cm">// 4. Field removed in v2</span>
+  <span class="ty">@removed</span>(Versions.v2)
+  <span class="prop">legacyTag</span>?: <span class="kw">string</span>;
+}</pre>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" style="border-color:var(--green)">
+          <h3>One source → two specs</h3>
+          <p>The compiler generates a <em>separate</em> <code>openapi.yaml</code> per version. The diff between versions lives in your TypeSpec source — tracked in Git, reviewed in PRs.</p>
+          <pre style="font-size:.78rem;margin-top:8px;background:transparent;border:none;padding:0">
+tsp-output/
+  schema/
+    openapi.v1.yaml
+    openapi.v2.yaml</pre>
+        </div>
+        <div class="card">
+          <h3>Version annotations</h3>
+          <table style="font-size:.88rem;margin-top:4px">
+            <thead><tr><th>Decorator</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>@versioned(V)</code></td><td>Marks a namespace as versioned</td></tr>
+              <tr><td><code>@added(V.v2)</code></td><td>Appeared in v2, absent in v1</td></tr>
+              <tr><td><code>@removed(V.v2)</code></td><td>Gone from v2 onward</td></tr>
+              <tr><td><code>@renamedFrom(V.v2, "old")</code></td><td>Renamed between versions</td></tr>
+              <tr><td><code>@madeOptional(V.v2)</code></td><td>Required in v1, optional in v2</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>vs raw OpenAPI</h3>
+          <p>Without TypeSpec: maintain two completely separate, manually-synced YAML files. Miss a field update in one → clients get inconsistent behaviour.<br/><br/>With TypeSpec: <em>impossible</em> to forget — the compiler derives both files from the same annotated source.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       SLIDE 31 – Alternative Solutions
+  ══════════════════════════════════════════════════════════════════ -->
+  <div class="slide" id="s31">
     <div class="slide-label">Ecosystem – Alternatives</div>
     <h2>Alternative Solutions</h2>
     <table style="margin-top:6px;font-size:.92rem">
@@ -1572,9 +1660,9 @@ linter:
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       SLIDE 31 – Q&A / Resources
+       SLIDE 32 – Q&A / Resources
   ══════════════════════════════════════════════════════════════════ -->
-  <div class="slide" id="s31">
+  <div class="slide" id="s32">
     <div class="slide-label">Fin</div>
     <h2>Resources &amp; Q&amp;A</h2>
     <div class="cols cols-2" style="flex:1;align-items:start">
@@ -1617,7 +1705,7 @@ linter:
 <!-- Controls -->
 <div id="controls">
   <button id="btn-prev" disabled>← Prev</button>
-  <span id="slide-counter">1 / 31</span>
+  <span id="slide-counter">1 / 32</span>
   <button id="btn-next">Next →</button>
   <span style="color:var(--muted);font-size:.8rem;margin-left:20px">
     ← → arrow keys also work &nbsp;|&nbsp; F for fullscreen
