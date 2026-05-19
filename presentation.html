@@ -1118,7 +1118,7 @@ tsp compile .</pre>
           </div>
           <div class="step">
             <div class="step-num">4</div>
-            <div class="step-body">Select the <strong>Generic REST API</strong> template.<br/>Make sure <code>@typespec/http</code> and <code>@typespec/openapi3</code> are selected.</div>
+            <div class="step-body">Select the <strong>Generic REST API</strong> template.<br/>Make sure <code>@typespec/openapi3</code> is selected.</div>
           </div>
           <div class="step">
             <div class="step-num">5</div>
@@ -1134,11 +1134,13 @@ emit:
 
 options:
   "@typespec/openapi3":
-    output-file: openapi.yaml</pre>
+    emitter-output-dir: "{output-dir}/schema"
+    openapi-versions:
+      - 3.1.0</pre>
         <p class="muted" style="margin-top:12px;margin-bottom:8px">Compile and inspect output</p>
         <pre>
 tsp compile .
-<span class="cm"># → tsp-output/@typespec/openapi3/openapi.yaml</span></pre>
+<span class="cm"># → tsp-output/schema/openapi.yaml</span></pre>
       </div>
     </div>
   </div>
@@ -1159,9 +1161,9 @@ tsp compile .
         <p class="muted" style="margin-bottom:8px">Replace <code>main.tsp</code> with:</p>
         <pre>
 <span class="kw">import</span> <span class="st">"@typespec/http"</span>;
-<span class="kw">using</span> TypeSpec.Http;
+<span class="kw">using</span> Http;
 
-<span class="ty">@service</span>({ <span class="prop">title</span>: <span class="st">"Pet Store API"</span> })
+<span class="ty">@service</span>(#{ <span class="prop">title</span>: <span class="st">"Pet Store API"</span> })
 <span class="kw">namespace</span> <span class="ty">PetStore</span>;
 
 <span class="kw">model</span> <span class="ty">Pet</span> {
