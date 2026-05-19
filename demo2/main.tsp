@@ -1,14 +1,31 @@
 import "@typespec/http";
 import "./shared/pagination.tsp";
+import "@typespec/versioning";
 
 using Http;
+using TypeSpec.Versioning;
+
+@versioned(Versions)
 @service(#{ title: "Pet Store API" })
 namespace PetStore;
+
+enum Versions {
+  v1,
+  v2,
+}
 
 // Spread PetBase — add id on top
 model Pet {
   id: PetId;
   ...PetBase;
+
+  // 2. Field added only in v2 — invisible in v1 spec
+  @added(Versions.v2)
+  microchipId?: string;
+
+  // 4. Field removed in v2
+  @removed(Versions.v2)
+  legacyTag?: string;
 }
 
 // Shared base model
@@ -18,7 +35,6 @@ model PetBase {
   age?: uint8;
 }
 
-
 // CreatePetRequest = PetBase (no id)
 model CreatePetRequest {
   ...PetBase;
@@ -26,6 +42,11 @@ model CreatePetRequest {
 
 @route("/pets")
 interface Pets {
+
+  @added(Versions.v2)
+  @get @route("/pets/microchip/{id}")
+  op findByMicrochip(@path id: string): Pet;
+
   @get
   listPets(@query skip?: int32, @query top?: int32): Page<Pet>;
 
@@ -65,6 +86,7 @@ model ValidationError {
 scalar PetId extends string;
 
 // Length + regex constraint
-@minLength(1) @maxLength(100)
+@minLength(1)
+@maxLength(100)
 @pattern("^[A-Za-z ]+$")
 scalar PetName extends string;
